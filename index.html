@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TokVibe - Klon TikToka</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js dla syntezy dźwięku i muzyki w tle -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Font Awesome dla ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+// ... existing code ... -->
+        /* Animacja przesuwania tekstu muzyki */
+        @keyframes marquee {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+            display: inline-block;
+            white-space: nowrap;
+            animation: marquee 8s linear infinite;
+        }
+
+        /* Animacja pisania bota (3 kropki) */
+        @keyframes bounceDot {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-5px); }
+        }
+        .typing-dot {
+            animation: bounceDot 1.2s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body class="bg-black text-white font-sans antialiased overflow-hidden select-none flex justify-center items-center h-screen w-screen">
+
+    <!-- Główny kontener aplikacji -->
+    <div id="app-container" class="relative w-full h-full md:w-[410px] md:h-[92vh] md:max-h-[850px] bg-darkBg md:rounded-3xl md:border md:border-neutral-800 md:shadow-2xl overflow-hidden flex flex-col">
+        
+        <!-- Górny pasek nawigacji (Dla Ciebie / Obserwowani / Dźwięk) -->
+        <header class="absolute top-0 left-0 right-0 z-30 pt-4 pb-2 px-4 flex justify-between items-center bg-gradient-to-b from-black/75 to-transparent pointer-events-none">
+            <button id="live-btn" onclick="showToast('Transmisje LIVE ruszają wkrótce! 🔴')" class="pointer-events-auto text-white/80 hover:text-white p-2 transition">
+                <i class="fa-solid fa-tv text-lg"></i>
+            </button>
+
+            <div class="flex space-x-5 items-center pointer-events-auto font-bold text-base">
+                <button id="tab-following" onclick="switchFeed('following')" class="text-white/60 hover:text-white transition relative py-1">
+                    Obserwowani
+                    <span id="indicator-following" class="hidden absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white rounded-full"></span>
+                </button>
+                <span class="text-white/20 text-xs">|</span>
+                <button id="tab-foryou" onclick="switchFeed('foryou')" class="text-white transition relative py-1">
+                    Dla Ciebie
+                    <span id="indicator-foryou" class="block absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white rounded-full"></span>
+                </button>
+            </div>
+
+            <!-- Przycisk włączania/wyciszania dźwięku -->
+            <button id="sound-toggle-btn" onclick="toggleGlobalSound()" class="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/15 text-white hover:bg-black/70 px-2.5 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold transition">
+                <i id="sound-icon" class="fa-solid fa-volume-xmark text-tiktokPink"></i>
+                <span id="sound-label">Włącz</span>
+            </button>
+        </header>
+
+        <!-- Główny strumień wideo (Scroll Snap) -->
+        <main id="video-feed" class="w-full h-full overflow-y-scroll snap-y snap-mandatory no-scrollbar scroll-smooth relative">
+            <!-- Kafelki wideo będą renderowane dynamicznie przez JS -->
+        </main>
+
+        <!-- Dolny pasek nawigacji -->
+        <nav class="absolute bottom-0 left-0 right-0 z-30 h-16 bg-black/95 border-t border-white/10 px-2 flex justify-around items-center text-[10px] font-medium">
+            <button onclick="closeAllModals()" class="nav-item flex flex-col items-center justify-center w-14 text-white">
+                <i class="fa-solid fa-house text-xl mb-1"></i>
+                <span>Główna</span>
+            </button>
+            <button onclick="showToast('Trendy #Polska #Coding #Vibe 🔥')" class="nav-item flex flex-col items-center justify-center w-14 text-neutral-400 hover:text-white transition">
+                <i class="fa-solid fa-compass text-xl mb-1"></i>
+                <span>Odkrywaj</span>
+            </button>
+            
+            <!-- Charakterystyczny przycisk "+" TikToka -->
+            <button onclick="openCreateModal()" class="relative group flex items-center justify-center w-12 h-8 mx-1 active:scale-95 transition">
+                <div class="absolute left-0 w-9 h-7 bg-tiktokCyan rounded-lg -translate-x-1"></div>
+                <div class="absolute right-0 w-9 h-7 bg-tiktokPink rounded-lg translate-x-1"></div>
+                <div class="relative w-10 h-7 bg-white text-black rounded-lg flex items-center justify-center shadow">
+                    <i class="fa-solid fa-plus text-base font-bold"></i>
+                </div>
+            </button>
+
+            <!-- Przycisk Skrzynki (Czat z ludźmi / botami) -->
+            <button onclick="openInboxModal()" class="nav-item flex flex-col items-center justify-center w-14 text-neutral-400 hover:text-white transition relative">
+                <i class="fa-regular fa-message text-xl mb-1"></i>
+                <span>Skrzynka</span>
+                <span id="inbox-badge" class="absolute top-0 right-2.5 px-1 min-w-[16px] h-4 bg-tiktokPink text-white text-[9px] font-bold rounded-full flex items-center justify-center">3</span>
+            </button>
+
+            <button onclick="openProfileModal()" class="nav-item flex flex-col items-center justify-center w-14 text-neutral-400 hover:text-white transition">
+                <i class="fa-regular fa-user text-xl mb-1"></i>
+                <span>Profil</span>
+            </button>
+        </nav>
+
+        <!-- ================= MODALE I NAKŁADKI ================= -->
+
+        <!-- 1. Szuflada Komentarzy -->
+        <div id="comments-drawer" class="fixed md:absolute inset-0 z-40 hidden flex-col justify-end bg-black/50 backdrop-blur-[1px] transition-opacity">
+            <div class="bg-neutral-900 w-full h-[65%] rounded-t-2xl flex flex-col border-t border-white/10 shadow-2xl transform transition-transform">
+                <div class="flex justify-between items-center px-4 py-3 border-b border-white/10">
+                    <div class="w-6"></div>
+                    <span id="comments-count-header" class="text-xs font-bold text-white">0 komentarzy</span>
+                    <button onclick="closeComments()" class="w-6 h-6 flex items-center justify-center text-neutral-400 hover:text-white">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+                
+                <div id="comments-list" class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar"></div>
+
+                <form onsubmit="submitComment(event)" class="p-3 bg-neutral-950 border-t border-white/10 flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-tiktokPink to-tiktokCyan flex items-center justify-center text-xs font-bold shrink-0">
+                        TY
+                    </div>
+                    <input type="text" id="comment-input" placeholder="Dodaj komentarz..." autocomplete="off"
+                        class="flex-1 bg-neutral-800 text-white text-sm rounded-full px-4 py-2 focus:outline-none focus:ring-1 focus:ring-tiktokPink">
+                    <button type="submit" class="bg-tiktokPink hover:bg-rose-600 text-white rounded-full w-9 h-9 flex items-center justify-center transition shrink-0">
+                        <i class="fa-solid fa-arrow-up text-sm"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 2. Modal Tworzenia Nowego Wideo (+) -->
+        <div id="create-modal" class="fixed md:absolute inset-0 z-50 hidden bg-neutral-950 flex-col p-5">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="closeCreateModal()" class="text-neutral-400 hover:text-white p-2">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+                <h2 class="font-bold text-base">Utwórz nowy klip</h2>
+                <div class="w-8"></div>
+            </div>
+
+            <form onsubmit="handleCreateVideo(event)" class="flex-1 flex flex-col justify-between">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-neutral-400 mb-1">Wybierz motyw wizualny i dźwiękowy</label>
+                        <div class="grid grid-cols-2 gap-2" id="theme-selector">
+                            <button type="button" onclick="selectTheme(event, 'neon')" class="theme-opt border-2 border-tiktokPink bg-neutral-900 p-3 rounded-xl text-left text-xs font-semibold">
+                                🌌 Neon Equalizer<br><span class="text-[10px] text-neutral-400 font-normal">Bit Synthwave 120 BPM</span>
+                            </button>
+                            <button type="button" onclick="selectTheme(event, 'matrix')" class="theme-opt border border-neutral-800 bg-neutral-900 p-3 rounded-xl text-left text-xs font-semibold">
+                                💻 Cyber Hack<br><span class="text-[10px] text-neutral-400 font-normal">Mroczny Cyberpunk Bass</span>
+                            </button>
+                            <button type="button" onclick="selectTheme(event, 'sunset')" class="theme-opt border border-neutral-800 bg-neutral-900 p-3 rounded-xl text-left text-xs font-semibold">
+                                🌅 Retro Outrun<br><span class="text-[10px] text-neutral-400 font-normal">Chill Lo-Fi Akordy</span>
+                            </button>
+                            <button type="button" onclick="selectTheme(event, 'particles')" class="theme-opt border border-neutral-800 bg-neutral-900 p-3 rounded-xl text-left text-xs font-semibold">
+                                🚀 Warp Speed<br><span class="text-[10px] text-neutral-400 font-normal">Kosmiczny Ambient</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-neutral-400 mb-1">Napis na środku ekranu (Hook)</label>
+                        <input type="text" id="new-video-hook" placeholder="np. POV: Piątek o 16:00 😎" maxlength="40"
+                            class="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-tiktokCyan">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-neutral-400 mb-1">Opis filmu i hashtagi</label>
+                        <textarea id="new-video-desc" rows="2" required placeholder="Napisz coś ciekawego... #fyp #polska #vibe"
+                            class="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-tiktokCyan"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-neutral-400 mb-1">Ścieżka dźwiękowa</label>
+                        <input type="text" id="new-video-music" value="Dźwięk oryginalny - Twój Profil" required
+                            class="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-tiktokCyan">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-tiktokPink to-rose-600 font-bold text-sm shadow-lg shadow-tiktokPink/30 hover:opacity-95 transition">
+                    Opublikuj w TokVibe
+                </button>
+            </form>
+        </div>
+
+        <!-- 3. Modal Profilu Użytkownika -->
+        <div id="profile-modal" class="fixed md:absolute inset-0 z-40 hidden bg-neutral-950 flex-col pb-16">
+            <div class="flex justify-between items-center p-4 border-b border-white/10">
+                <div class="w-6"></div>
+                <span class="font-bold text-sm">@twoj_profil</span>
+                <button onclick="closeProfileModal()" class="text-neutral-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="flex flex-col items-center pt-6 px-4">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-tiktokCyan to-tiktokPink p-1 mb-3">
+                    <div class="w-full h-full rounded-full bg-neutral-900 flex items-center justify-center text-2xl font-extrabold">
+                        TY
+                    </div>
+                </div>
+                <h3 class="font-bold text-base">@twoj_profil</h3>
+                <p class="text-xs text-neutral-400 mt-1">Twórca cyfrowy | Polska 🇵🇱</p>
+                
+                <div class="flex space-x-8 my-5 text-center">
+                    <div>
+                        <div id="stat-following" class="font-bold text-base">1</div>
+                        <div class="text-[11px] text-neutral-400">Obserwowani</div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-base">14.2K</div>
+                        <div class="text-[11px] text-neutral-400">Obserwujący</div>
+                    </div>
+                    <div>
+                        <div id="stat-likes" class="font-bold text-base">0</div>
+                        <div class="text-[11px] text-neutral-400">Polubienia</div>
+                    </div>
+                </div>
+
+                <div class="w-full border-t border-white/10 pt-3">
+                    <p class="text-xs font-semibold text-neutral-400 mb-3 text-center">Polubione i Twoje filmy</p>
+                    <div id="profile-grid" class="grid grid-cols-3 gap-1 max-h-64 overflow-y-auto no-scrollbar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. SKRZYNKA ODBIORCZA I CZAT Z BOTAMI -->
+        <div id="inbox-modal" class="fixed md:absolute inset-0 z-40 hidden bg-neutral-950 flex-col pb-16">
+            <!-- Widok 1: Lista konwersacji -->
+            <div id="inbox-list-view" class="flex flex-col h-full">
+                <div class="flex justify-between items-center p-4 border-b border-white/10">
+                    <div class="w-6"></div>
+                    <span class="font-bold text-base">Wiadomości</span>
+                    <button onclick="closeInboxModal()" class="text-neutral-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Pasek aktywnych znajomych (Stories/Online) -->
+                <div class="px-4 py-3 border-b border-white/5">
+                    <p class="text-[11px] text-neutral-400 font-semibold mb-2.5">Aktywni teraz</p>
+                    <div id="online-bots-bar" class="flex space-x-4 overflow-x-auto no-scrollbar">
+                        <!-- Renderowane dynamicznie -->
+                    </div>
+                </div>
+
+                <!-- Lista czatów -->
+                <div id="chat-threads-list" class="flex-1 overflow-y-auto divide-y divide-white/5 no-scrollbar">
+                    <!-- Renderowane dynamicznie -->
+                </div>
+            </div>
+
+            <!-- Widok 2: Aktywna rozmowa 1-na-1 z wybranym botem -->
+            <div id="chat-room-view" class="hidden flex-col h-full bg-neutral-950">
+                <!-- Nagłówek pokoju czatu -->
+                <div class="flex items-center justify-between px-3 py-3 border-b border-white/10 bg-neutral-900/80">
+                    <div class="flex items-center space-x-2.5">
+                        <button onclick="backToInboxList()" class="text-white p-1.5 hover:bg-white/10 rounded-full transition">
+                            <i class="fa-solid fa-chevron-left text-base"></i>
+                        </button>
+                        <div id="chat-room-avatar" class="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-xs relative">
+                            KU
+                            <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-neutral-900 rounded-full"></span>
+                        </div>
+                        <div>
+                            <div id="chat-room-name" class="font-bold text-sm leading-tight">@kuba_coding</div>
+                            <div id="chat-room-status" class="text-[10px] text-emerald-400">Aktywny teraz</div>
+                        </div>
+                    </div>
+                    <button onclick="closeInboxModal()" class="text-neutral-400 hover:text-white p-1.5">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Historia wiadomości -->
+                <div id="chat-messages-container" class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar flex flex-col">
+                    <!-- Wiadomości -->
+                </div>
+
+                <!-- Wskaźnik pisania przez bota -->
+                <div id="bot-typing-indicator" class="hidden px-4 py-1.5 text-xs text-neutral-400 flex items-center space-x-2">
+                    <div class="bg-neutral-800 px-3 py-2 rounded-2xl rounded-bl-none flex space-x-1 items-center">
+                        <span class="w-1.5 h-1.5 bg-neutral-400 rounded-full typing-dot"></span>
+                        <span class="w-1.5 h-1.5 bg-neutral-400 rounded-full typing-dot"></span>
+                        <span class="w-1.5 h-1.5 bg-neutral-400 rounded-full typing-dot"></span>
+                    </div>
+                </div>
+
+                <!-- Szybkie podpowiedzi wiadomości -->
+                <div class="px-3 py-1.5 flex space-x-1.5 overflow-x-auto no-scrollbar">
+                    <button type="button" onclick="sendQuickReply('Siema! Super ostatni filmik 🔥')" class="shrink-0 bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-[11px] px-2.5 py-1 rounded-full text-neutral-300 transition">
+                        Siema! Super filmik 🔥
+                    </button>
+                    <button type="button" onclick="sendQuickReply('Jaką muzykę wrzuciłeś w tle?')" class="shrink-0 bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-[11px] px-2.5 py-1 rounded-full text-neutral-300 transition">
+                        Jaka to nuta? 🎵
+                    </button>
+                    <button type="button" onclick="sendQuickReply('Nagramy razem duet?')" class="shrink-0 bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-[11px] px-2.5 py-1 rounded-full text-neutral-300 transition">
+                        Nagramy duet? 🎬
+                    </button>
+                </div>
+
+                <!-- Formularz wysyłania wiadomości -->
+                <form onsubmit="handleSendChatMessage(event)" class="p-3 bg-neutral-900 border-t border-white/10 flex items-center gap-2">
+                    <input type="text" id="chat-message-input" placeholder="Wyślij wiadomość..." autocomplete="off"
+                        class="flex-1 bg-neutral-800 text-white text-sm rounded-full px-4 py-2 focus:outline-none focus:ring-1 focus:ring-tiktokCyan">
+                    <button type="submit" class="bg-tiktokPink hover:bg-rose-600 text-white rounded-full w-9 h-9 flex items-center justify-center transition shrink-0">
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Customowy Toast -->
+        <div id="toast-box" class="pointer-events-none fixed md:absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-neutral-800/95 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl border border-white/10 opacity-0 transition-opacity duration-300 whitespace-nowrap">
+            Powiadomienie
+        </div>
+
+    </div>
+
+    <script>
+        // ================= DANE POCZĄTKOWE APLIKACJI =================
+        let videosData = [
+            {
+                id: 'vid-1',
+                username: '@kuba_coding',
+                avatarColor: 'from-cyan-400 to-blue-600',
+                hookText: 'POV: Kod działa za 1. razem 🤯',
+                description: 'Kiedy odpalasz projekt po 3 godzinach pisania i zero błędów w konsoli 🔥 #programowanie #it #polska #fyp',
+                music: 'Synthwave Night Drive - Bass Boosted',
+                likes: 12450,
+                isLiked: false,
+                isBookmarked: false,
+                isFollowing: false,
+                theme: 'neon',
+                audioStyle: 'synthwave',
+                comments: [
+                    { user: '@anna_dev', text: 'Niemożliwe, na pewno zapomniałeś zapisać pliku 😂', time: '2 godz.' },
+                    { user: '@marek99', text: 'Rel totalny! Zawsze tak mam w piątek o 16:00', time: '1 godz.' }
+                ]
+            },
+            {
+                id: 'vid-2',
+                username: '@podroze_z_pasja',
+                avatarColor: 'from-amber-400 to-rose-600',
+                hookText: 'Zachód słońca w Bieszczadach 🌅',
+                description: 'Ten klimat potrafi zatrzymać czas ✨ Kto już planuje wyjazd w góry? #gory #natura #podroze #chill',
+                music: 'Chill Lo-Fi Beats - Sunset Vibes',
+                likes: 48920,
+                isLiked: true,
+                isBookmarked: false,
+                isFollowing: true,
+                theme: 'sunset',
+                audioStyle: 'lofi',
+                comments: [
+                    { user: '@kasia_w', text: 'Przepiękne kolory! Muszę tam pojechać w tym roku 😍', time: '5 godz.' }
+                ]
+            },
+            {
+                id: 'vid-3',
+                username: '@cyber_art_pl',
+                avatarColor: 'from-emerald-400 to-teal-700',
+                hookText: 'SYSTEM BREACH // 99.9% 💚',
+                description: 'Wejdź do Matrixa... Generatywny kod w czasie rzeczywistym z ciężkim basem 💻🔊 #sztuka #matrix #cyberpunk',
+                music: 'Cyberpunk Bassline - Club Mix 2026',
+                likes: 8310,
+                isLiked: false,
+                isBookmarked: true,
+                isFollowing: false,
+                theme: 'matrix',
+                audioStyle: 'cyberpunk',
+                comments: [
+                    { user: '@neo_pl', text: 'Wybieram czerwoną pigułkę 💊', time: '15 min' },
+                    { user: '@design_pro', text: 'Ale ten bas buja! 🔥', time: '5 min' }
+                ]
+            },
+            {
+                id: 'vid-4',
+                username: '@kosmos_na_co_dzien',
+                avatarColor: 'from-purple-500 to-indigo-800',
+                hookText: 'Prędkość nadświetlna: WŁĄCZONA 🚀',
+                description: 'Podróż przez mgławicę Oriona z prędkością światła 🌌 Zostaw serduszko jeśli kochasz kosmos! #astronomia #kosmos',
+                music: 'Interstellar Ambient - Deep Space',
+                likes: 93200,
+                isLiked: false,
+                isBookmarked: false,
+                isFollowing: false,
+                theme: 'particles',
+                audioStyle: 'space',
+                comments: [
+                    { user: '@astro_fan', text: 'Mógłbym na to patrzeć godzinami ✨', time: '1 dzień' }
+                ]
+            }
+        ];
+
+        // ================= DANE BOTÓW DO CZATU (SKRZYNKA) =================
+        let botsData = [
+            {
+                id: 'bot-kuba',
+                username: '@kuba_coding',
+                name: 'Kuba | Dev & Tech',
+                avatarText: 'KU',
+                avatarColor: 'from-cyan-400 to-blue-600',
+                persona: 'Jesteś polskim programistą i twórcą na TokVibe (@kuba_coding). Piszesz na luzie, używasz slangu IT (bugi, deploy, kawa, JS), jesteś przyjazny, dowcipny i odpisujesz krótko (1-3 zdania) jak na czacie w aplikacji społecznościowej.',
+                unread: 1,
+                messages: [
+                    { sender: 'bot', text: 'Siema! Dzięki za wpadnięcie na profil 🙌 Widziałeś mój ostatni klip o kodowaniu?', time: '14:20' }
+                ]
+            },
+            {
+                id: 'bot-podroze',
+                username: '@podroze_z_pasja',
+                name: 'Maja Podróżniczka ✈️',
+                avatarText: 'MA',
+                avatarColor: 'from-amber-400 to-rose-600',
+                persona: 'Jesteś energiczną polską podróżniczką (@podroze_z_pasja) na TokVibe. Kochasz góry, zachody słońca, kawę w trasie i spontaniczne wypady. Odpisujesz ciepło, entuzjastycznie, używasz emoji i piszesz krótko (1-3 zdania).',
+                unread: 1,
+                messages: [
+                    { sender: 'bot', text: 'Hejoo! 🌅 Właśnie wróciłam ze szlaku w Bieszczadach, widoki były kosmiczne! A jak tam Twój dzień?', time: '12:05' }
+                ]
+            },
+            {
+                id: 'bot-cyber',
+                username: '@cyber_art_pl',
+                name: 'VEX // Cyber Art',
+                avatarText: 'VX',
+                avatarColor: 'from-emerald-400 to-teal-700',
+                persona: 'Jesteś tajemniczym twórcą sztuki cyfrowej, hakerem estetyki cyberpunk i producentem muzyki elektronicznej (@cyber_art_pl). Piszesz stylowo, lekko futurystycznie, nawiązujesz do Matrixa, neonów i syntezatorów. Odpowiadaj krótko (1-3 zdania).',
+                unread: 1,
+                messages: [
+                    { sender: 'bot', text: 'Połączenie nawiązane... 🟢 Widzę, że lubisz dobre bity i klimat Matrixa. Co tam słychać w realnym świecie?', time: 'Wczoraj' }
+                ]
+            },
+            {
+                id: 'bot-kosmos',
+                username: '@kosmos_na_co_dzien',
+                name: 'AstroTomek 🚀',
+                avatarText: 'AT',
+                avatarColor: 'from-purple-500 to-indigo-800',
+                persona: 'Jesteś pasjonatem astronomii i fizyki kwantowej (@kosmos_na_co_dzien). Uwielbiasz ciekawostki o czarnych dziurach, gwiazdach i rakietach. Odpisujesz z fascynacją, przyjaźnie i krótko (1-3 zdania).',
+                unread: 0,
+                messages: [
+                    { sender: 'bot', text: 'Cześć kosmiczny podróżniku! 🌌 Gdybyś mógł polecieć na dowolną planetę, co byś wybrał?', time: 'Pon.' }
+                ]
+            }
+        ];
+
+        let currentFeedTab = 'foryou';
+        let activeCommentVideoId = null;
+        let selectedCreateTheme = 'neon';
+        let pausedVideos = {};
+        let lastTapTime = 0;
+        let activeChatBotId = null;
+
+        // ================= SILNIK AUDIO (TONE.JS) =================
+        let isSoundEnabled = false;
+        let audioInitialized = false;
+        let currentPlayingVideoId = null;
+        let activeAudioLoop = null;
+        let activeSynth = null;
+        let activeBass = null;
+        let audioBeatPulse = 0; // Wartość 0..1 używana do pulsowania wizualizacji Canvas!
+
+        async function initAudioEngine() {
+            if (audioInitialized) return;
+            await Tone.start();
+            audioInitialized = true;
+        }
+
+        async function toggleGlobalSound() {
+            await initAudioEngine();
+            isSoundEnabled = !isSoundEnabled;
+            updateSoundButtonUI();
+
+            if (isSoundEnabled) {
+                const visibleId = getCurrentlyVisibleVideoId();
+                if (visibleId && !pausedVideos[visibleId]) {
+                    playMusicForVideo(visibleId);
+                }
+                showToast('Dźwięk włączony 🔊');
+            } else {
+                stopCurrentMusic();
+                showToast('Wyciszono 🔇');
+            }
+        }
+
+        function updateSoundButtonUI() {
+            const icon = document.getElementById('sound-icon');
+            const label = document.getElementById('sound-label');
+            if (isSoundEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-tiktokCyan';
+                label.textContent = 'Gra';
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-tiktokPink';
+                label.textContent = 'Włącz';
+            }
+        }
+
+        function stopCurrentMusic() {
+            if (activeAudioLoop) {
+                activeAudioLoop.stop();
+                activeAudioLoop.dispose();
+                activeAudioLoop = null;
+            }
+            if (activeSynth) {
+                activeSynth.dispose();
+                activeSynth = null;
+            }
+            if (activeBass) {
+                activeBass.dispose();
+                activeBass = null;
+            }
+            Tone.Transport.stop();
+            currentPlayingVideoId = null;
+            audioBeatPulse = 0;
+        }
+
+        async function playMusicForVideo(videoId) {
+            if (!isSoundEnabled || pausedVideos[videoId]) return;
+            if (currentPlayingVideoId === videoId) return;
+
+            await initAudioEngine();
+            stopCurrentMusic();
+
+            const video = videosData.find(v => v.id === videoId);
+            if (!video) return;
+
+            currentPlayingVideoId = videoId;
+            const style = video.audioStyle || 'synthwave';
+
+            if (style === 'synthwave') {
+                // Energetyczny Synthwave 120 BPM
+                Tone.Transport.bpm.value = 120;
+                activeSynth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.02, decay: 0.2, sustain: 0.2, release: 0.4 }
+                }).toDestination();
+                activeSynth.volume.value = -12;
+
+                activeBass = new Tone.MembraneSynth().toDestination();
+                activeBass.volume.value = -8;
+
+                const notes = ['C4', 'E4', 'G4', 'B4', 'A4', 'G4', 'E4', 'D4'];
+                let step = 0;
+
+                activeAudioLoop = new Tone.Loop((time) => {
+                    const note = notes[step % notes.length];
+                    activeSynth.triggerAttackRelease(note, '8n', time);
+                    if (step % 2 === 0) {
+                        activeBass.triggerAttackRelease('C2', '8n', time);
+                        audioBeatPulse = 1.0;
+                    }
+                    step++;
+                }, '8n').start(0);
+
+            } else if (style === 'lofi') {
+                // Spokojne Lo-Fi 82 BPM
+                Tone.Transport.bpm.value = 82;
+                activeSynth = new Tone.PolySynth(Tone.AMSynth, {
+                    envelope: { attack: 0.2, decay: 0.5, sustain: 0.4, release: 1.2 }
+                }).toDestination();
+                activeSynth.volume.value = -10;
+
+                const chords = [
+                    ['F3', 'A3', 'C4', 'E4'],
+                    ['E3', 'G3', 'B3', 'D4'],
+                    ['D3', 'F3', 'A3', 'C4'],
+                    ['C3', 'E3', 'G3', 'B3']
+                ];
+                let step = 0;
+
+                activeAudioLoop = new Tone.Loop((time) => {
+                    activeSynth.triggerAttackRelease(chords[step % chords.length], '2n', time);
+                    audioBeatPulse = 0.7;
+                    step++;
+                }, '2n').start(0);
+
+            } else if (style === 'cyberpunk') {
+                // Ciężki Cyberpunk Bass 132 BPM
+                Tone.Transport.bpm.value = 132;
+                activeBass = new Tone.MonoSynth({
+                    oscillator: { type: 'square' },
+                    filter: { Q: 4, type: 'lowpass', rolloff: -24 },
+                    envelope: { attack: 0.01, decay: 0.15, sustain: 0.1, release: 0.2 }
+                }).toDestination();
+                activeBass.volume.value = -10;
+
+                const bassLine = ['E1', 'E1', 'G1', 'E1', 'A1', 'G1', 'D1', 'E1'];
+                let step = 0;
+
+                activeAudioLoop = new Tone.Loop((time) => {
+                    activeBass.triggerAttackRelease(bassLine[step % bassLine.length], '16n', time);
+                    if (step % 2 === 0) audioBeatPulse = 1.0;
+                    step++;
+                }, '8n').start(0);
+
+            } else {
+                // Kosmiczny Ambient
+                Tone.Transport.bpm.value = 70;
+                activeSynth = new Tone.PolySynth(Tone.FMSynth, {
+                    envelope: { attack: 0.6, decay: 0.8, sustain: 0.6, release: 1.8 }
+                }).toDestination();
+                activeSynth.volume.value = -12;
+
+                const spaceNotes = [['C3', 'G3', 'D4'], ['A2', 'E3', 'B3'], ['F2', 'C3', 'G3']];
+                let step = 0;
+
+                activeAudioLoop = new Tone.Loop((time) => {
+                    activeSynth.triggerAttackRelease(spaceNotes[step % spaceNotes.length], '1m', time);
+                    audioBeatPulse = 0.6;
+                    step++;
+                }, '1m').start(0);
+            }
+
+            Tone.Transport.start();
+        }
+
+        function getCurrentlyVisibleVideoId() {
+            const feed = document.getElementById('video-feed');
+            const sections = feed.querySelectorAll('section[data-video-id]');
+            const scrollTop = feed.scrollTop;
+            const height = feed.clientHeight || 1;
+            const index = Math.round(scrollTop / height);
+            return sections[index]?.dataset?.videoId || null;
+        }
+
+        // ================= SYSTEM POWIADOMIEŃ (TOAST) =================
+        let toastTimeout;
+        function showToast(message) {
+            const toast = document.getElementById('toast-box');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 2200);
+        }
+
+        function formatCount(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        // ================= RENDEROWANIE STRUMIENIA WIDEO =================
+        function renderFeed() {
+            const feedContainer = document.getElementById('video-feed');
+            feedContainer.innerHTML = '';
+
+            const filteredVideos = currentFeedTab === 'following' 
+                ? videosData.filter(v => v.isFollowing)
+                : videosData;
+
+            if (filteredVideos.length === 0) {
+                stopCurrentMusic();
+                feedContainer.innerHTML = `
+                    <div class="w-full h-full flex flex-col items-center justify-center p-8 text-center snap-start">
+                        <i class="fa-solid fa-user-group text-4xl text-neutral-600 mb-4"></i>
+                        <h3 class="font-bold text-lg mb-1">Nikogo jeszcze nie obserwujesz</h3>
+                        <p class="text-xs text-neutral-400 mb-4">Kliknij przycisk "+" przy awatarze twórcy w zakładce "Dla Ciebie", aby zobaczyć tutaj jego filmy.</p>
+                        <button onclick="switchFeed('foryou')" class="bg-tiktokPink px-5 py-2 rounded-full text-xs font-bold">Przejdź do Dla Ciebie</button>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredVideos.forEach((video) => {
+                const section = document.createElement('section');
+                section.className = 'relative w-full h-full snap-start snap-always overflow-hidden bg-neutral-950 flex items-center justify-center';
+                section.dataset.videoId = video.id;
+
+                section.innerHTML = `
+                    <!-- Generatywne płótno wideo (Canvas) -->
+                    <canvas id="canvas-${video.id}" class="absolute inset-0 w-full h-full object-cover"></canvas>
+
+                    <!-- Ciemny gradient dla czytelności -->
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/35 pointer-events-none"></div>
+
+                    <!-- Charakterystyczny napis na środku rolki (Hook) -->
+                    ${video.hookText ? `
+                    <div class="absolute top-24 left-1/2 -translate-x-1/2 z-10 pointer-events-none w-[82%] text-center">
+                        <span class="inline-block bg-black/55 backdrop-blur-md border border-white/15 text-white font-extrabold text-sm px-4 py-1.5 rounded-xl shadow-lg">
+                            ${video.hookText}
+                        </span>
+                    </div>` : ''}
+
+                    <!-- Ikona Pauzy na środku ekranu -->
+                    <div id="pause-icon-${video.id}" class="hidden absolute z-20 pointer-events-none text-white/80 text-6xl drop-shadow-lg">
+                        <i class="fa-solid fa-play"></i>
+                    </div>
+
+                    <!-- Warstwa dotykowa (Pauza + Dźwięk / Podwójne kliknięcie = Like) -->
+                    <div onclick="handleVideoTap(event, '${video.id}')" class="absolute inset-0 z-10 cursor-pointer"></div>
+
+                    <!-- Prawy pasek akcji -->
+                    <div class="absolute right-3 bottom-20 z-20 flex flex-col items-center space-y-5">
+                        <!-- Awatar + Obserwuj -->
+                        <div class="relative mb-1">
+                            <div onclick="openChatWithCreator('${video.username}')" title="Napisz wiadomość" class="cursor-pointer w-12 h-12 rounded-full p-0.5 bg-white shadow-md hover:scale-105 transition">
+                                <div class="w-full h-full rounded-full bg-gradient-to-tr ${video.avatarColor} flex items-center justify-center font-bold text-sm uppercase">
+                                    ${video.username.substring(1, 3)}
+                                </div>
+                            </div>
+                            <button onclick="toggleFollow('${video.id}')" id="follow-btn-${video.id}" 
+                                class="${video.isFollowing ? 'bg-neutral-700 text-white' : 'bg-tiktokPink text-white'} absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow transition transform active:scale-90">
+                                <i class="fa-solid ${video.isFollowing ? 'fa-check' : 'fa-plus'}"></i>
+                            </button>
+                        </div>
+
+                        <!-- Polubienie -->
+                        <button onclick="toggleLike('${video.id}')" class="flex flex-col items-center group">
+                            <div class="w-10 h-10 flex items-center justify-center transition transform active:scale-125">
+                                <i id="like-icon-${video.id}" class="fa-solid fa-heart text-3xl drop-shadow ${video.isLiked ? 'text-tiktokPink' : 'text-white'}"></i>
+                            </div>
+                            <span id="like-count-${video.id}" class="text-xs font-semibold drop-shadow">${formatCount(video.likes)}</span>
+                        </button>
+
+                        <!-- Komentarze -->
+                        <button onclick="openComments('${video.id}')" class="flex flex-col items-center group">
+                            <div class="w-10 h-10 flex items-center justify-center transition transform active:scale-110">
+                                <i class="fa-solid fa-comment-dots text-3xl text-white drop-shadow"></i>
+                            </div>
+                            <span id="comment-count-${video.id}" class="text-xs font-semibold drop-shadow">${video.comments.length}</span>
+                        </button>
+
+                        <!-- Ulubione -->
+                        <button onclick="toggleBookmark('${video.id}')" class="flex flex-col items-center">
+                            <div class="w-10 h-10 flex items-center justify-center transition transform active:scale-110">
+                                <i id="bookmark-icon-${video.id}" class="fa-solid fa-bookmark text-2xl drop-shadow ${video.isBookmarked ? 'text-amber-400' : 'text-white'}"></i>
+                            </div>
+                            <span class="text-[11px] font-medium drop-shadow">Zapisz</span>
+                        </button>
+
+                        <!-- Udostępnij -->
+                        <button onclick="shareVideo('${video.id}')" class="flex flex-col items-center">
+                            <div class="w-10 h-10 flex items-center justify-center transition transform active:scale-110">
+                                <i class="fa-solid fa-share text-2xl text-white drop-shadow"></i>
+                            </div>
+                            <span class="text-[11px] font-medium drop-shadow">Udostępnij</span>
+                        </button>
+
+                        <!-- Obracająca się płyta muzyczna -->
+                        <div class="pt-1">
+                            <div id="disc-${video.id}" class="w-11 h-11 rounded-full bg-neutral-900 border-[6px] border-neutral-800 flex items-center justify-center animate-spin-slow shadow-lg">
+                                <div class="w-4 h-4 rounded-full bg-gradient-to-tr ${video.avatarColor}"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dolny lewy opis wideo -->
+                    <div class="absolute left-4 right-20 bottom-20 z-20 pointer-events-none flex flex-col space-y-2">
+                        <div onclick="openChatWithCreator('${video.username}')" class="font-bold text-base drop-shadow pointer-events-auto cursor-pointer hover:underline w-fit flex items-center gap-1.5">
+                            <span>${video.username}</span>
+                            <span class="text-[10px] bg-white/15 px-1.5 py-0.5 rounded text-tiktokCyan font-medium">Napisz</span>
+                        </div>
+                        <p class="text-sm text-white/95 leading-snug drop-shadow line-clamp-3">
+                            ${video.description}
+                        </p>
+                        <div class="flex items-center space-x-2 pt-1 overflow-hidden">
+                            <i class="fa-solid fa-music text-xs text-white shrink-0"></i>
+                            <div class="overflow-hidden w-48">
+                                <span class="text-xs font-medium text-white/90 animate-marquee">${video.music}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                feedContainer.appendChild(section);
+            });
+
+            initCanvases();
+            observeVideoScroll();
+        }
+
+        // Wykrywanie aktualnie przewiniętego wideo i zmiana muzyki
+        function observeVideoScroll() {
+            const feed = document.getElementById('video-feed');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
+                        const vidId = entry.target.dataset.videoId;
+                        if (isSoundEnabled && !pausedVideos[vidId]) {
+                            playMusicForVideo(vidId);
+                        }
+                    }
+                });
+            }, { root: feed, threshold: 0.65 });
+
+            feed.querySelectorAll('section[data-video-id]').forEach(sec => observer.observe(sec));
+        }
+
+        // ================= INTERAKCJE UŻYTKOWNIKA =================
+        async function handleVideoTap(event, videoId) {
+            // Jeśli dźwięk nie był jeszcze włączony przez użytkownika, odblokuj audio przy pierwszym kliknięciu
+            if (!audioInitialized) {
+                await initAudioEngine();
+                isSoundEnabled = true;
+                updateSoundButtonUI();
+                playMusicForVideo(videoId);
+                return;
+            }
+
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+
+            if (tapLength < 300 && tapLength > 0) {
+                spawnHeartAnimation(event);
+                const video = videosData.find(v => v.id === videoId);
+                if (video && !video.isLiked) {
+                    toggleLike(videoId);
+                }
+            } else {
+                togglePause(videoId);
+            }
+            lastTapTime = currentTime;
+        }
+
+        function spawnHeartAnimation(event) {
+            const container = document.getElementById('app-container');
+            const rect = container.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            const heart = document.createElement('i');
+            heart.className = 'fa-solid fa-heart text-tiktokPink text-7xl absolute z-30 pointer-events-none heart-burst drop-shadow-2xl';
+            heart.style.left = `${x}px`;
+            heart.style.top = `${y}px`;
+
+            container.appendChild(heart);
+            setTimeout(() => heart.remove(), 800);
+        }
+
+        function togglePause(videoId) {
+            pausedVideos[videoId] = !pausedVideos[videoId];
+            const pauseIcon = document.getElementById(`pause-icon-${videoId}`);
+            const disc = document.getElementById(`disc-${videoId}`);
+
+            if (pausedVideos[videoId]) {
+                pauseIcon?.classList.remove('hidden');
+                disc?.classList.add('paused-spin');
+                if (currentPlayingVideoId === videoId) {
+                    stopCurrentMusic();
+                }
+            } else {
+                pauseIcon?.classList.add('hidden');
+                disc?.classList.remove('paused-spin');
+                if (isSoundEnabled) {
+                    playMusicForVideo(videoId);
+                }
+            }
+        }
+
+        function toggleLike(videoId) {
+            const video = videosData.find(v => v.id === videoId);
+            if (!video) return;
+
+            video.isLiked = !video.isLiked;
+            video.likes += video.isLiked ? 1 : -1;
+
+            const icon = document.getElementById(`like-icon-${videoId}`);
+            const count = document.getElementById(`like-count-${videoId}`);
+
+            if (icon) {
+                icon.classList.toggle('text-tiktokPink', video.isLiked);
+                icon.classList.toggle('text-white', !video.isLiked);
+            }
+            if (count) {
+                count.textContent = formatCount(video.likes);
+            }
+        }
+
+        function toggleFollow(videoId) {
+            const video = videosData.find(v => v.id === videoId);
+            if (!video) return;
+
+            video.isFollowing = !video.isFollowing;
+            const btn = document.getElementById(`follow-btn-${videoId}`);
+            if (btn) {
+                btn.className = `${video.isFollowing ? 'bg-neutral-700 text-white' : 'bg-tiktokPink text-white'} absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow transition transform active:scale-90`;
+                btn.innerHTML = `<i class="fa-solid ${video.isFollowing ? 'fa-check' : 'fa-plus'}"></i>`;
+            }
+            showToast(video.isFollowing ? `Obserwujesz ${video.username}` : `Przestałeś obserwować ${video.username}`);
+        }
+
+        function toggleBookmark(videoId) {
+            const video = videosData.find(v => v.id === videoId);
+            if (!video) return;
+
+            video.isBookmarked = !video.isBookmarked;
+            const icon = document.getElementById(`bookmark-icon-${videoId}`);
+            if (icon) {
+                icon.classList.toggle('text-amber-400', video.isBookmarked);
+                icon.classList.toggle('text-white', !video.isBookmarked);
+            }
+            showToast(video.isBookmarked ? 'Dodano do Ulubionych' : 'Usunięto z Ulubionych');
+        }
+
+        function shareVideo(videoId) {
+            const dummyInput = document.createElement('input');
+            dummyInput.value = `https://tokvibe.app/v/${videoId}`;
+            document.body.appendChild(dummyInput);
+            dummyInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummyInput);
+            showToast('Skopiowano link do schowka! 🔗');
+        }
+
+        function switchFeed(tab) {
+            currentFeedTab = tab;
+            const tabForyou = document.getElementById('tab-foryou');
+            const tabFollowing = document.getElementById('tab-following');
+            const indForyou = document.getElementById('indicator-foryou');
+            const indFollowing = document.getElementById('indicator-following');
+
+            if (tab === 'foryou') {
+                tabForyou.classList.replace('text-white/60', 'text-white');
+                tabFollowing.classList.replace('text-white', 'text-white/60');
+                indForyou.classList.remove('hidden');
+                indFollowing.classList.add('hidden');
+            } else {
+                tabFollowing.classList.replace('text-white/60', 'text-white');
+                tabForyou.classList.replace('text-white', 'text-white/60');
+                indFollowing.classList.remove('hidden');
+                indForyou.classList.add('hidden');
+            }
+            renderFeed();
+        }
+
+        function closeAllModals() {
+            closeComments();
+            closeCreateModal();
+            closeProfileModal();
+            closeInboxModal();
+        }
+
+        // ================= SYSTEM KOMENTARZY =================
+        function openComments(videoId) {
+            activeCommentVideoId = videoId;
+            const drawer = document.getElementById('comments-drawer');
+            drawer.classList.remove('hidden');
+            drawer.classList.add('flex');
+            renderCommentsList();
+        }
+
+        function closeComments() {
+            const drawer = document.getElementById('comments-drawer');
+            drawer.classList.add('hidden');
+            drawer.classList.remove('flex');
+            activeCommentVideoId = null;
+        }
+
+        function renderCommentsList() {
+            const video = videosData.find(v => v.id === activeCommentVideoId);
+            if (!video) return;
+
+            document.getElementById('comments-count-header').textContent = `${video.comments.length} komentarzy`;
+            const list = document.getElementById('comments-list');
+            
+            if (video.comments.length === 0) {
+                list.innerHTML = `<p class="text-center text-neutral-500 text-xs py-10">Brak komentarzy. Bądź pierwszy!</p>`;
+                return;
+            }
+
+            list.innerHTML = video.comments.map(c => `
+                <div class="flex items-start space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-bold text-neutral-300 shrink-0 uppercase">
+                        ${c.user.substring(1, 3)}
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-xs font-semibold text-neutral-400">${c.user}</div>
+                        <p class="text-sm text-white mt-0.5">${c.text}</p>
+                        <div class="text-[10px] text-neutral-500 mt-1">${c.time} · Odpowiedz</div>
+                    </div>
+                    <button onclick="this.classList.toggle('text-tiktokPink')" class="text-neutral-500 text-xs pt-1">
+                        <i class="fa-regular fa-heart"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function submitComment(event) {
+            event.preventDefault();
+            const input = document.getElementById('comment-input');
+            const text = input.value.trim();
+            if (!text || !activeCommentVideoId) return;
+
+            const video = videosData.find(v => v.id === activeCommentVideoId);
+            if (video) {
+                video.comments.unshift({
+                    user: '@twoj_profil',
+                    text: text,
+                    time: 'Teraz'
+                });
+                input.value = '';
+                renderCommentsList();
+                
+                const countBadge = document.getElementById(`comment-count-${video.id}`);
+                if (countBadge) countBadge.textContent = video.comments.length;
+            }
+        }
+
+        // ================= TWORZENIE NOWEGO KLIPU (+) =================
+        function openCreateModal() {
+            closeAllModals();
+            const modal = document.getElementById('create-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeCreateModal() {
+            const modal = document.getElementById('create-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function selectTheme(event, theme) {
+            selectedCreateTheme = theme;
+            document.querySelectorAll('.theme-opt').forEach(btn => {
+                btn.classList.remove('border-2', 'border-tiktokPink');
+                btn.classList.add('border', 'border-neutral-800');
+            });
+            event.currentTarget.classList.remove('border', 'border-neutral-800');
+            event.currentTarget.classList.add('border-2', 'border-tiktokPink');
+        }
+
+        function handleCreateVideo(event) {
+            event.preventDefault();
+            const hook = document.getElementById('new-video-hook').value.trim();
+            const desc = document.getElementById('new-video-desc').value.trim();
+            const music = document.getElementById('new-video-music').value.trim();
+
+            const audioMap = {
+                neon: 'synthwave',
+                sunset: 'lofi',
+                matrix: 'cyberpunk',
+                particles: 'space'
+            };
+
+            const newVideo = {
+                id: 'vid-' + Date.now(),
+                username: '@twoj_profil',
+                avatarColor: 'from-tiktokPink to-tiktokCyan',
+                hookText: hook,
+                description: desc,
+                music: music,
+                likes: 1,
+                isLiked: true,
+                isBookmarked: false,
+                isFollowing: true,
+                theme: selectedCreateTheme,
+                audioStyle: audioMap[selectedCreateTheme] || 'synthwave',
+                comments: []
+            };
+
+            videosData.unshift(newVideo);
+            document.getElementById('new-video-hook').value = '';
+            document.getElementById('new-video-desc').value = '';
+            closeCreateModal();
+            switchFeed('foryou');
+            document.getElementById('video-feed').scrollTo({ top: 0, behavior: 'smooth' });
+            if (isSoundEnabled) playMusicForVideo(newVideo.id);
+            showToast('Twój film został opublikowany! 🎉');
+        }
+
+        // ================= SKRZYNKA ODBIORCZA I CZAT Z BOTAMI AI =================
+        function openInboxModal() {
+            closeAllModals();
+            const modal = document.getElementById('inbox-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            backToInboxList();
+        }
+
+        function closeInboxModal() {
+            const modal = document.getElementById('inbox-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            activeChatBotId = null;
+        }
+
+        function openChatWithCreator(username) {
+            const bot = botsData.find(b => b.username === username);
+            if (!bot) {
+                showToast('Ten twórca ma wyłączone wiadomości prywatne');
+                return;
+            }
+            openInboxModal();
+            openChatRoom(bot.id);
+        }
+
+        function updateInboxBadge() {
+            const totalUnread = botsData.reduce((sum, b) => sum + b.unread, 0);
+            const badge = document.getElementById('inbox-badge');
+            if (totalUnread > 0) {
+                badge.textContent = totalUnread;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function backToInboxList() {
+            activeChatBotId = null;
+            document.getElementById('chat-room-view').classList.add('hidden');
+            document.getElementById('chat-room-view').classList.remove('flex');
+            document.getElementById('inbox-list-view').classList.remove('hidden');
+            document.getElementById('inbox-list-view').classList.add('flex');
+            renderInboxList();
+        }
+
+        function renderInboxList() {
+            const onlineBar = document.getElementById('online-bots-bar');
+            const threadsList = document.getElementById('chat-threads-list');
+
+            onlineBar.innerHTML = botsData.map(bot => `
+                <button onclick="openChatRoom('${bot.id}')" class="flex flex-col items-center shrink-0 space-y-1 group">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-tr ${bot.avatarColor} p-0.5 relative">
+                        <div class="w-full h-full rounded-full bg-neutral-900 flex items-center justify-center font-bold text-xs">
+                            ${bot.avatarText}
+                        </div>
+                        <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-neutral-950 rounded-full"></span>
+                    </div>
+                    <span class="text-[10px] text-neutral-300 max-w-[64px] truncate group-hover:text-white">${bot.username.replace('@', '')}</span>
+                </button>
+            `).join('');
+
+            threadsList.innerHTML = botsData.map(bot => {
+                const lastMsg = bot.messages[bot.messages.length - 1];
+                return `
+                    <div onclick="openChatRoom('${bot.id}')" class="flex items-center justify-between px-4 py-3.5 hover:bg-white/5 cursor-pointer transition">
+                        <div class="flex items-center space-x-3 overflow-hidden">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-tr ${bot.avatarColor} flex items-center justify-center font-bold text-sm shrink-0 relative">
+                                ${bot.avatarText}
+                                <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-neutral-950 rounded-full"></span>
+                            </div>
+                            <div class="overflow-hidden">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-sm text-white truncate">${bot.name}</span>
+                                    <span class="text-[10px] text-neutral-500">${lastMsg ? lastMsg.time : ''}</span>
+                                </div>
+                                <p class="text-xs ${bot.unread > 0 ? 'text-white font-semibold' : 'text-neutral-400'} truncate mt-0.5">
+                                    ${lastMsg ? (lastMsg.sender === 'user' ? 'Ty: ' + lastMsg.text : lastMsg.text) : 'Napisz wiadomość...'}
+                                </p>
+                            </div>
+                        </div>
+                        ${bot.unread > 0 ? `<span class="w-2.5 h-2.5 bg-tiktokPink rounded-full shrink-0 ml-2"></span>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            updateInboxBadge();
+        }
+
+        function openChatRoom(botId) {
+            const bot = botsData.find(b => b.id === botId);
+            if (!bot) return;
+
+            activeChatBotId = botId;
+            bot.unread = 0;
+            updateInboxBadge();
+
+            document.getElementById('inbox-list-view').classList.add('hidden');
+            document.getElementById('inbox-list-view').classList.remove('flex');
+            document.getElementById('chat-room-view').classList.remove('hidden');
+            document.getElementById('chat-room-view').classList.add('flex');
+
+            const avatarEl = document.getElementById('chat-room-avatar');
+            avatarEl.className = `w-9 h-9 rounded-full bg-gradient-to-tr ${bot.avatarColor} flex items-center justify-center font-bold text-xs relative`;
+            avatarEl.innerHTML = `${bot.avatarText}<span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-neutral-900 rounded-full"></span>`;
+            
+            document.getElementById('chat-room-name').textContent = bot.name;
+            renderChatMessages();
+        }
+
+        function renderChatMessages() {
+            const bot = botsData.find(b => b.id === activeChatBotId);
+            if (!bot) return;
+
+            const container = document.getElementById('chat-messages-container');
+            container.innerHTML = bot.messages.map(msg => {
+                if (msg.sender === 'user') {
+                    return `
+                        <div class="self-end max-w-[78%] flex flex-col items-end">
+                            <div class="bg-tiktokPink text-white text-sm px-3.5 py-2 rounded-2xl rounded-br-sm shadow">
+                                ${msg.text}
+                            </div>
+                            <span class="text-[9px] text-neutral-500 mt-1">${msg.time}</span>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="self-start max-w-[78%] flex flex-col items-start">
+                            <div class="bg-neutral-800 text-white text-sm px-3.5 py-2 rounded-2xl rounded-bl-sm border border-white/5">
+                                ${msg.text}
+                            </div>
+                            <span class="text-[9px] text-neutral-500 mt-1">${msg.time}</span>
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function sendQuickReply(text) {
+            const input = document.getElementById('chat-message-input');
+            input.value = text;
+            handleSendChatMessage(new Event('submit'));
+        }
+
+        async function handleSendChatMessage(event) {
+            event.preventDefault();
+            const input = document.getElementById('chat-message-input');
+            const text = input.value.trim();
+            if (!text || !activeChatBotId) return;
+
+            const bot = botsData.find(b => b.id === activeChatBotId);
+            if (!bot) return;
+
+            const now = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            bot.messages.push({ sender: 'user', text, time: now });
+            input.value = '';
+            renderChatMessages();
+
+            // Pokaż wskaźnik pisania bota
+            const typingEl = document.getElementById('bot-typing-indicator');
+            const statusEl = document.getElementById('chat-room-status');
+            typingEl.classList.remove('hidden');
+            statusEl.textContent = 'Pisze...';
+
+            const replyText = await generateBotReply(bot, text);
+
+            typingEl.classList.add('hidden');
+            statusEl.textContent = 'Aktywny teraz';
+
+            const replyTime = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            bot.messages.push({ sender: 'bot', text: replyText, time: replyTime });
+
+            if (activeChatBotId === bot.id) {
+                renderChatMessages();
+            } else {
+                bot.unread += 1;
+                updateInboxBadge();
+            }
+        }
+
+        // Generowanie odpowiedzi bota przez Gemini API z fallbackiem offline
+        async function generateBotReply(bot, userMessage) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const conversationContext = bot.messages.slice(-6).map(m => 
+                `${m.sender === 'user' ? 'Użytkownik' : bot.name}: ${m.text}`
+            ).join('\n');
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: `Historia czatu:\n${conversationContext}\n\nOdpowiedz jako ${bot.name} na ostatnią wiadomość użytkownika: "${userMessage}"` }]
+                }],
+                systemInstruction: {
+                    parts: [{ text: bot.persona }]
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error('API error');
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) return text.trim();
+            } catch (err) {
+                // Inteligentne odpowiedzi zapasowe dopasowane do postaci
+                await new Promise(r => setTimeout(r, 900));
+                if (bot.id === 'bot-kuba') {
+                    const replies = [
+                        'Haha dokładnie! Jeszcze tylko jedna kawa i wrzucam nowy odcinek o JavaScripcie ☕💻',
+                        'Duet? Jasne, tylko najpierw naprawię tego jednego buga na produkcji 😂🔥',
+                        'Nuta w tle to czysty Synthwave – idealny do kodowania po nocy! 🎧'
+                    ];
+                    return replies[Math.floor(Math.random() * replies.length)];
+                } else if (bot.id === 'bot-podroze') {
+                    const replies = [
+                        'Dziękuję kochana/kochany! ✨ Następny przystanek to Tatry o wschodzie słońca 🏔️',
+                        'Zawsze chętnie! Pakuj plecak i ruszamy w trasę 🎒🌅',
+                        'To mój ulubiony chillowy kawałek Lo-Fi na długie podróże pociągiem 🚂🎵'
+                    ];
+                    return replies[Math.floor(Math.random() * replies.length)];
+                } else if (bot.id === 'bot-cyber') {
+                    const replies = [
+                        'Sygnał odebrany 🟢 Ten bas sam programowałem na syntezatorze o 3 w nocy 🔊',
+                        'Wchodzimy na wyższy poziom symulacji... Duet brzmi jak dobry plan ⚡',
+                        'Neony nigdy nie gasną. Dzięki za wsparcie na kanale! 💚'
+                    ];
+                    return replies[Math.floor(Math.random() * replies.length)];
+                } else {
+                    const replies = [
+                        'Kosmos nie przestaje zadziwiać! 🚀 Cieszę się, że wpadłeś na mój kanał ✨',
+                        'Wiedziałeś, że na Saturnie padają diamentowe deszcze? Kosmos jest niesamowity! 🪐',
+                        'Dzięki za wiadomość! Już szykuję kolejny materiał o czarnych dziurach 🌌'
+                    ];
+                    return replies[Math.floor(Math.random() * replies.length)];
+                }
+            }
+            return 'Dzięki za wiadomość! 🔥🙌';
+        }
+
+        // ================= PROFIL UŻYTKOWNIKA =================
+        function openProfileModal() {
+            closeAllModals();
+            const modal = document.getElementById('profile-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            const followingCount = videosData.filter(v => v.isFollowing).length;
+            const likedVideos = videosData.filter(v => v.isLiked);
+            
+            document.getElementById('stat-following').textContent = followingCount;
+            document.getElementById('stat-likes').textContent = likedVideos.length;
+
+            const grid = document.getElementById('profile-grid');
+            grid.innerHTML = likedVideos.map(v => `
+                <div class="aspect-[3/4] bg-neutral-900 rounded-md p-2 flex flex-col justify-between border border-white/5 relative overflow-hidden">
+                    <div class="text-[10px] font-bold text-tiktokCyan truncate">${v.username}</div>
+                    <p class="text-[9px] text-neutral-300 line-clamp-3">${v.description}</p>
+                    <div class="text-[10px] font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-heart text-tiktokPink text-[9px]"></i> ${formatCount(v.likes)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function closeProfileModal() {
+            const modal = document.getElementById('profile-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ================= ULEPSZONY SILNIK ANIMACJI CANVAS (REAKTYWNY NA DŹWIĘK) =================
+        let animationFrameId;
+
+        function initCanvases() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            const canvases = videosData.map(video => {
+                const canvas = document.getElementById(`canvas-${video.id}`);
+                if (!canvas) return null;
+                const ctx = canvas.getContext('2d');
+                
+                const resize = () => {
+                    canvas.width = canvas.offsetWidth || 400;
+                    canvas.height = canvas.offsetHeight || 800;
+                };
+                resize();
+                window.addEventListener('resize', resize);
+
+                const particles = Array.from({ length: 65 }, () => ({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    z: Math.random() * 2 + 0.5,
+                    r: Math.random() * 3.5 + 1.2,
+                    vx: (Math.random() - 0.5) * 2.5,
+                    vy: (Math.random() - 0.5) * 2.5,
+                    hue: Math.random() * 360
+                }));
+
+                return { video, canvas, ctx, particles, tick: Math.random() * 100 };
+            }).filter(Boolean);
+
+            function renderLoop() {
+                // Stopniowe wygaszanie impulsu basu
+                audioBeatPulse *= 0.92;
+                const pulse = isSoundEnabled ? audioBeatPulse : (Math.sin(Date.now() * 0.006) * 0.3 + 0.3);
+
+                canvases.forEach(item => {
+                    const { video, canvas, ctx, particles } = item;
+                    if (pausedVideos[video.id]) return;
+
+                    item.tick += 0.035;
+                    const w = canvas.width;
+                    const h = canvas.height;
+
+                    if (video.theme === 'neon') {
+                        // Motyw 1: Reaktywny Korektor Muzyczny + Fale Neonowe
+                        ctx.fillStyle = 'rgba(8, 8, 16, 0.25)';
+                        ctx.fillRect(0, 0, w, h);
+
+                        // Fale
+                        for (let i = 0; i < 4; i++) {
+                            ctx.beginPath();
+                            ctx.lineWidth = 2.5 + pulse * 2;
+                            ctx.strokeStyle = i % 2 === 0 ? '#25F4EE' : '#FE2C55';
+                            for (let x = 0; x < w; x += 12) {
+                                const amp = (60 + i * 20) * (0.8 + pulse * 0.6);
+                                const y = h * 0.45 + Math.sin(x * 0.018 + item.tick + i) * amp;
+                                if (x === 0) ctx.moveTo(x, y);
+                                else ctx.lineTo(x, y);
+                            }
+                            ctx.stroke();
+                        }
+
+                        // Słupki korektora audio na środku
+                        const bars = 24;
+                        const barWidth = (w * 0.7) / bars;
+                        const startX = w * 0.15;
+                        for (let b = 0; b < bars; b++) {
+                            const barH = (Math.abs(Math.sin(item.tick * 2 + b * 0.5)) * 75 + 15) * (0.6 + pulse * 0.8);
+                            ctx.fillStyle = b % 2 === 0 ? 'rgba(37, 244, 238, 0.75)' : 'rgba(254, 44, 85, 0.75)';
+                            ctx.fillRect(startX + b * barWidth, h * 0.45 - barH / 2, barWidth - 3, barH);
+                        }
+
+                    } else if (video.theme === 'sunset') {
+                        // Motyw 2: Retro Outrun z pulsującym słońcem i perspektywą 3D
+                        const grad = ctx.createLinearGradient(0, 0, 0, h);
+                        grad.addColorStop(0, '#0f0c29');
+                        grad.addColorStop(0.48, '#9d174d');
+                        grad.addColorStop(0.55, '#f59e0b');
+                        grad.addColorStop(1, '#1e1b4b');
+                        ctx.fillStyle = grad;
+                        ctx.fillRect(0, 0, w, h);
+
+                        // Słońce z paskami retro
+                        const sunRadius = 85 + pulse * 14;
+                        const sunY = h * 0.42;
+                        ctx.beginPath();
+                        ctx.arc(w / 2, sunY, sunRadius, 0, Math.PI * 2);
+                        ctx.fillStyle = '#fde047';
+                        ctx.fill();
+
+                        // Poziome wycięcia w słońcu
+                        ctx.fillStyle = '#9d174d';
+                        for (let s = 0; s < 5; s++) {
+                            ctx.fillRect(w / 2 - sunRadius, sunY + 15 + s * 14, sunRadius * 2, 3 + s * 0.8);
+                        }
+
+                        // Siatka 3D na dole
+                        ctx.strokeStyle = 'rgba(37, 244, 238, 0.35)';
+                        ctx.lineWidth = 1.2;
+                        const horizon = h * 0.56;
+                        for (let i = -6; i <= 6; i++) {
+                            ctx.beginPath();
+                            ctx.moveTo(w / 2 + i * 25, horizon);
+                            ctx.lineTo(w / 2 + i * 110, h);
+                            ctx.stroke();
+                        }
+                        for (let y = horizon; y < h; y += 22) {
+                            const offset = (item.tick * 18) % 22;
+                            ctx.beginPath();
+                            ctx.moveTo(0, y + offset);
+                            ctx.lineTo(w, y + offset);
+                            ctx.stroke();
+                        }
+
+                    } else if (video.theme === 'matrix') {
+                        // Motyw 3: Cyfrowy deszcz Matrix + pulsujący rdzeń
+                        ctx.fillStyle = 'rgba(0, 10, 4, 0.18)';
+                        ctx.fillRect(0, 0, w, h);
+                        ctx.fillStyle = '#10b981';
+                        ctx.font = 'bold 15px monospace';
+
+                        particles.forEach((p, idx) => {
+                            const char = String.fromCharCode(0x30A0 + ((idx + Math.floor(item.tick * 6)) % 96));
+                            ctx.fillStyle = idx % 7 === 0 ? '#a7f3d0' : '#10b981';
+                            ctx.fillText(char, p.x, p.y);
+                            p.y += 4.5 + pulse * 3;
+                            if (p.y > h) p.y = 0;
+                        });
+
+                        // Pulsujący okrąg hakerski
+                        ctx.beginPath();
+                        ctx.arc(w / 2, h * 0.46, 55 + pulse * 25, 0, Math.PI * 2);
+                        ctx.strokeStyle = 'rgba(16, 185, 129, 0.45)';
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+
+                    } else {
+                        // Motyw 4: Podróż z prędkością nadświetlną (Warp Speed Stars)
+                        ctx.fillStyle = 'rgba(6, 6, 16, 0.28)';
+                        ctx.fillRect(0, 0, w, h);
+                        const cx = w / 2;
+                        const cy = h * 0.46;
+
+                        particles.forEach(p => {
+                            const dx = p.x - cx;
+                            const dy = p.y - cy;
+                            const speed = 1.03 + pulse * 0.04;
+                            p.x = cx + dx * speed;
+                            p.y = cy + dy * speed;
+
+                            if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+                                p.x = cx + (Math.random() - 0.5) * 60;
+                                p.y = cy + (Math.random() - 0.5) * 60;
+                            }
+
+                            ctx.beginPath();
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(cx + dx * 0.92, cy + dy * 0.92);
+                            ctx.strokeStyle = `hsl(${(p.hue + item.tick * 25) % 360}, 90%, 70%)`;
+                            ctx.lineWidth = p.r;
+                            ctx.stroke();
+                        });
+                    }
+                });
+
+                animationFrameId = requestAnimationFrame(renderLoop);
+            }
+
+            renderLoop();
+        }
+
+        // Inicjalizacja aplikacji po załadowaniu okna
+        window.onload = () => {
+            renderFeed();
+            updateInboxBadge();
+        };
+    </script>
+</body>
+</html>
